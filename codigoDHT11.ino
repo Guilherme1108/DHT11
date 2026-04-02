@@ -1,7 +1,7 @@
 //________________
 //DHT11
 //________________
-#include <Wifi.h>
+#include <WiFi.h>
 #include <HTTPClient.h>
 #include "DHT.h"
 
@@ -12,11 +12,11 @@
 DHT dht(DHTPIN, DHTTYPE);
 
 // CONEXÃO DE WIFI
-const char* ssid = "nome da rede";
-const char* password = "senha";
+const char* ssid = "IoT-B08";
+const char* password = "12345678";
 
 //Ip SERVER
-const char* serverIP = "192.168.1.0"; /*altera o IP conforme o 1° circuito*/
+const char* serverIP = "192.168.0.115"; /*altera o IP conforme o 1° circuito*/
 
 //controle de canal
 unsigned long lastSend = 0;
@@ -29,32 +29,33 @@ bool wifiConnected = false;
 //----------------------
 bool connectWifi(){
   Serial.println("\n[WIFI]Resetando a interface.....");
-  Wifi.disconnected(true);
-  delay(1000)
-  Wifi.mode(WIFI_STA);
-  Wifi.begin(ssid, password);
+  WiFi.disconnect(true);
+  delay(1000);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
   Serial.println("\n[WIFI]conectando.....");
   Serial.println("\n[WIFI]ssid:  ");
-  Serial.println](ssid);
+  Serial.println(ssid);
 
   int tentativas = 0;
-  while(Wifi.status() !=WL_CONNECTED && tentativas < 20){
+  while(WiFi.status() !=WL_CONNECTED && tentativas < 20){
     delay(500);
     Serial.println(".");
     tentativas++;
   }
 
-  if(Wifi.status()== WL_CONNECTED){
+  if(WiFi.status()== WL_CONNECTED){
     Serial.println("\n[WIFI] Conectando!");
     Serial.println("[WIFI]: ");
-    Serial.println(Wifi.localIP());
+    Serial.println(WiFi.localIP());
 
     return true;
   }else{
-    Seria.println("\n[WIFI] Falha na conexão");
+    Serial.println("\n[WIFI] Falha na conexão");
     return false;
   }
 }
+
 //_________________
 // Envio HTTP
 //_________________
@@ -79,5 +80,66 @@ void sendData(float temp, float hum){
   http.end();
   
 }
+
+//_________________
+// Setup
+//_________________
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  Serial.println("\n[BOOT] Inicializando DHT Client...");
+
+  dht.begin();
+
+  wifiConnected = connectWifi();
+}
+
+//_________________
+// Loop
+//_________________
+void loop() {
+
+  // Reconexão wifi
+  if (WiFi.status() != WL_CONNECTED) {
+
+    if (wifiConnected) {
+      Serial.println("[WIFi] COnexão perdida!");
+      wifiConnected = false;
+    }
+
+    delay(2000);
+    wifiConnected = connectWifi();
+    return;
+  }
+
+  //Envio periódico (sem delay travando)
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastSend >= interval) {
+
+    lastSend = currentMillis;
+
+    float temp = dht.readTemperature();
+    float hum = dht.readHumidity();
+
+    if (isnan(temp) || isnan(hum)) {
+      Serial.println("[DHT] Falha na leitura");
+      return;
+    }
+
+    Serial.print("[DHT] Temp: ");
+    Serial.print(temp);
+    Serial.print(" °C | Umidade: ");
+    Serial.println(hum);
+
+    sendData(temp, hum);
+  }
+}
+
+
+
+
+
 
 
